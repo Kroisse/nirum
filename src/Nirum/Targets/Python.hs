@@ -99,6 +99,9 @@ data Source = Source { sourcePackage :: Package
 type Code = T.Text
 type CompileError = T.Text
 
+data PythonVersion = Python2 | Python3
+    deriving (Eq, Show)
+
 instance Failure CodeGenContext CompileError where
     fromString = return . T.pack
 
@@ -106,13 +109,15 @@ data CodeGenContext
     = CodeGenContext { standardImports :: S.Set T.Text
                      , thirdPartyImports :: M.Map T.Text (S.Set T.Text)
                      , localImports :: M.Map T.Text (S.Set T.Text)
+                     , pythonVersion :: PythonVersion
                      }
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Show)
 
 emptyContext :: CodeGenContext
 emptyContext = CodeGenContext { standardImports = []
                               , thirdPartyImports = []
                               , localImports = []
+                              , pythonVersion = Python3
                               }
 
 type CodeGen = C.CodeGen CodeGenContext CompileError
