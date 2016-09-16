@@ -11,6 +11,7 @@ module Nirum.Targets.Python ( Code
                                               , dependencies
                                               , optionalDependencies
                                               )
+                            , PythonVersion(..)
                             , Source( Source
                                     , sourceModule
                                     , sourcePackage
@@ -113,12 +114,12 @@ data CodeGenContext
                      }
     deriving (Eq, Show)
 
-emptyContext :: CodeGenContext
-emptyContext = CodeGenContext { standardImports = []
-                              , thirdPartyImports = []
-                              , localImports = []
-                              , pythonVersion = Python3
-                              }
+emptyContext :: PythonVersion -> CodeGenContext
+emptyContext pyVer = CodeGenContext { standardImports = []
+                                    , thirdPartyImports = []
+                                    , localImports = []
+                                    , pythonVersion = pyVer
+                                    }
 
 type CodeGen = C.CodeGen CodeGenContext CompileError
 
@@ -644,7 +645,7 @@ unionInstallRequires a b =
 
 compileModule :: Source -> Either CompileError (InstallRequires, Code)
 compileModule source =
-    case runCodeGen code' emptyContext of
+    case runCodeGen code' (emptyContext Python3) of
         (Left  errMsg, _      ) -> Left errMsg
         (Right code  , context) -> codeWithDeps context $ [qq|
 {imports $ standardImports context}

@@ -88,6 +88,7 @@ import Nirum.Targets.Python ( Source (Source)
                                               , dependencies
                                               , optionalDependencies
                                               )
+                            , PythonVersion ( Python3 )
                             , addDependency
                             , addOptionalDependency
                             , compilePackage
@@ -285,7 +286,7 @@ makeDummySource :: Module -> Source
 makeDummySource = makeDummySource' []
 
 run' :: CodeGen a -> (Either CompileError a, CodeGenContext)
-run' c = runCodeGen c emptyContext
+run' c = runCodeGen c (emptyContext Python3)
 
 code :: CodeGen a -> a
 code = either (const undefined) id . fst . run'
@@ -294,7 +295,7 @@ codeContext :: CodeGen a -> CodeGenContext
 codeContext = snd . run'
 
 compileError :: CodeGen a -> Maybe CompileError
-compileError cg = either Just (const Nothing) $ fst $ runCodeGen cg emptyContext
+compileError = either Just (const Nothing) . fst . run'
 
 
 spec :: Spec
@@ -309,7 +310,7 @@ spec = parallel $ do
                         insertStandardImport "os"
                         insertThirdPartyImports [("nirum", ["serialize_enum_type"])]
                         insertLocalImport ".." "Path"
-                let (e, ctx) = runCodeGen c emptyContext
+                let (e, ctx) = run' c
                 e `shouldSatisfy` isRight
                 standardImports ctx `shouldBe` ["os", "sys"]
                 thirdPartyImports ctx `shouldBe`
@@ -317,14 +318,14 @@ spec = parallel $ do
                 localImports ctx `shouldBe` [("..", ["Gender", "Path"])]
         specify "insertStandardImport" $ do
             let codeGen1 = insertStandardImport "sys"
-            let (e1, ctx1) = runCodeGen codeGen1 emptyContext
+            let (e1, ctx1) = run' codeGen1
             e1 `shouldSatisfy` isRight
             standardImports ctx1 `shouldBe` ["sys"]
             thirdPartyImports ctx1 `shouldBe` []
             localImports ctx1 `shouldBe` []
             compileError codeGen1 `shouldBe` Nothing
             let codeGen2 = codeGen1 >> insertStandardImport "os"
-            let (e2, ctx2) = runCodeGen codeGen2 emptyContext
+            let (e2, ctx2) = run' codeGen2
             e2 `shouldSatisfy` isRight
             standardImports ctx2 `shouldBe` ["os", "sys"]
             thirdPartyImports ctx2 `shouldBe` []
