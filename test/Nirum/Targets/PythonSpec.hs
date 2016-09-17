@@ -88,7 +88,7 @@ import Nirum.Targets.Python ( Source (Source)
                                               , dependencies
                                               , optionalDependencies
                                               )
-                            , PythonVersion ( Python3 )
+                            , PythonVersion ( .. )
                             , addDependency
                             , addOptionalDependency
                             , compilePackage
@@ -285,17 +285,20 @@ makeDummySource' pathPrefix m =
 makeDummySource :: Module -> Source
 makeDummySource = makeDummySource' []
 
-run' :: CodeGen a -> (Either CompileError a, CodeGenContext)
-run' c = runCodeGen c (emptyContext Python3)
+run' :: PythonVersion -> CodeGen a -> (Either CompileError a, CodeGenContext)
+run' pyVer c = runCodeGen c (emptyContext pyVer)
 
-code :: CodeGen a -> a
-code = either (const undefined) id . fst . run'
+code :: PythonVersion -> CodeGen a -> a
+code pyVer = either (const undefined) id . fst . run' pyVer
 
-codeContext :: CodeGen a -> CodeGenContext
-codeContext = snd . run'
+compileError :: PythonVersion -> CodeGen a -> Maybe CompileError
+compileError pyVer = either Just (const Nothing) . fst . run' pyVer
 
-compileError :: CodeGen a -> Maybe CompileError
-compileError = either Just (const Nothing) . fst . run'
+run2 = run' Python2
+compileError2 = compileError Python2
+
+run3 = run' Python3
+compileError3 = compileError Python3
 
 
 spec :: Spec
@@ -310,7 +313,7 @@ spec = parallel $ do
                         insertStandardImport "os"
                         insertThirdPartyImports [("nirum", ["serialize_enum_type"])]
                         insertLocalImport ".." "Path"
-                let (e, ctx) = run' c
+                let (e, ctx) = run3 c
                 e `shouldSatisfy` isRight
                 standardImports ctx `shouldBe` ["os", "sys"]
                 thirdPartyImports ctx `shouldBe`
@@ -318,70 +321,124 @@ spec = parallel $ do
                 localImports ctx `shouldBe` [("..", ["Gender", "Path"])]
         specify "insertStandardImport" $ do
             let codeGen1 = insertStandardImport "sys"
-            let (e1, ctx1) = run' codeGen1
+            let (e1, ctx1) = run3 codeGen1
             e1 `shouldSatisfy` isRight
             standardImports ctx1 `shouldBe` ["sys"]
             thirdPartyImports ctx1 `shouldBe` []
             localImports ctx1 `shouldBe` []
-            compileError codeGen1 `shouldBe` Nothing
+            compileError2 codeGen1 `shouldBe` Nothing
+            compileError3 codeGen1 `shouldBe` Nothing
             let codeGen2 = codeGen1 >> insertStandardImport "os"
-            let (e2, ctx2) = run' codeGen2
+            let (e2, ctx2) = run3 codeGen2
             e2 `shouldSatisfy` isRight
             standardImports ctx2 `shouldBe` ["os", "sys"]
             thirdPartyImports ctx2 `shouldBe` []
             localImports ctx2 `shouldBe` []
-            compileError codeGen2 `shouldBe` Nothing
+            compileError2 codeGen1 `shouldBe` Nothing
+            compileError3 codeGen2 `shouldBe` Nothing
 
-    specify "compilePrimitiveType" $ do
-        code (compilePrimitiveType Bool) `shouldBe` "bool"
-        code (compilePrimitiveType Bigint) `shouldBe` "int"
-        let (decimalCode, decimalContext) = run' (compilePrimitiveType Decimal)
-        decimalCode `shouldBe` Right "decimal.Decimal"
-        standardImports decimalContext `shouldBe` ["decimal"]
-        code (compilePrimitiveType Int32) `shouldBe` "int"
-        code (compilePrimitiveType Int64) `shouldBe` "int"
-        code (compilePrimitiveType Float32) `shouldBe` "float"
-        code (compilePrimitiveType Float64) `shouldBe` "float"
-        code (compilePrimitiveType Text) `shouldBe` "str"
-        code (compilePrimitiveType Binary) `shouldBe` "bytes"
-        let (dateCode, dateContext) = run' (compilePrimitiveType Date)
-        dateCode `shouldBe` Right "datetime.date"
-        standardImports dateContext `shouldBe` ["datetime"]
-        let (datetimeCode, datetimeContext) = run' (compilePrimitiveType Datetime)
-        datetimeCode `shouldBe` Right "datetime.datetime"
-        standardImports datetimeContext `shouldBe` ["datetime"]
-        let (uuidCode, uuidContext) = run' (compilePrimitiveType Uuid)
-        uuidCode `shouldBe` Right "uuid.UUID"
-        standardImports uuidContext `shouldBe` ["uuid"]
-        code (compilePrimitiveType Uri) `shouldBe` "str"
+    describe "compilePrimitiveType" $ do
+        specify "Python 2" $ do
+            let code2 = code Python2
+            code2 (compilePrimitiveType Bool) `shouldBe` "bool"
+            code2 (compilePrimitiveType Bigint) `shouldBe` "int"
+            let (decimalCode, decimalContext) = run3 (compilePrimitiveType Decimal)
+            decimalCode `shouldBe` Right "decimal.Decimal"
+            standardImports decimalContext `shouldBe` ["decimal"]
+            code2 (compilePrimitiveType Int32) `shouldBe` "int"
+            code2 (compilePrimitiveType Int64) `shouldBe` "long"
+            code2 (compilePrimitiveType Float32) `shouldBe` "float"
+            code2 (compilePrimitiveType Float64) `shouldBe` "float"
+            code2 (compilePrimitiveType Text) `shouldBe` "unicode"
+            code2 (compilePrimitiveType Binary) `shouldBe` "bytes"
+            let (dateCode, dateContext) = run3 (compilePrimitiveType Date)
+            dateCode `shouldBe` Right "datetime.date"
+            standardImports dateContext `shouldBe` ["datetime"]
+            let (datetimeCode, datetimeContext) = run3 (compilePrimitiveType Datetime)
+            datetimeCode `shouldBe` Right "datetime.datetime"
+            standardImports datetimeContext `shouldBe` ["datetime"]
+            let (uuidCode, uuidContext) = run3 (compilePrimitiveType Uuid)
+            uuidCode `shouldBe` Right "uuid.UUID"
+            standardImports uuidContext `shouldBe` ["uuid"]
+            code2 (compilePrimitiveType Uri) `shouldBe` "unicode"
+        specify "Python 3" $ do
+            let code3 = code Python3
+            code3 (compilePrimitiveType Bool) `shouldBe` "bool"
+            code3 (compilePrimitiveType Bigint) `shouldBe` "int"
+            let (decimalCode, decimalContext) = run3 (compilePrimitiveType Decimal)
+            decimalCode `shouldBe` Right "decimal.Decimal"
+            standardImports decimalContext `shouldBe` ["decimal"]
+            code3 (compilePrimitiveType Int32) `shouldBe` "int"
+            code3 (compilePrimitiveType Int64) `shouldBe` "int"
+            code3 (compilePrimitiveType Float32) `shouldBe` "float"
+            code3 (compilePrimitiveType Float64) `shouldBe` "float"
+            code3 (compilePrimitiveType Text) `shouldBe` "str"
+            code3 (compilePrimitiveType Binary) `shouldBe` "bytes"
+            let (dateCode, dateContext) = run3 (compilePrimitiveType Date)
+            dateCode `shouldBe` Right "datetime.date"
+            standardImports dateContext `shouldBe` ["datetime"]
+            let (datetimeCode, datetimeContext) = run3 (compilePrimitiveType Datetime)
+            datetimeCode `shouldBe` Right "datetime.datetime"
+            standardImports datetimeContext `shouldBe` ["datetime"]
+            let (uuidCode, uuidContext) = run3 (compilePrimitiveType Uuid)
+            uuidCode `shouldBe` Right "uuid.UUID"
+            standardImports uuidContext `shouldBe` ["uuid"]
+            code3 (compilePrimitiveType Uri) `shouldBe` "str"
 
     describe "compileTypeExpression" $ do
         let s = makeDummySource $ Module [] Nothing
-        specify "TypeIdentifier" $ do
-            let (c, ctx) = run' $ compileTypeExpression s (TypeIdentifier "bigint")
-            standardImports ctx `shouldBe` []
-            localImports ctx `shouldBe` []
-            c `shouldBe` Right "int"
-        specify "OptionModifier" $ do
-            let (c', ctx') = run' $ compileTypeExpression s (OptionModifier "text")
-            standardImports ctx' `shouldBe` ["typing"]
-            localImports ctx' `shouldBe` []
-            c' `shouldBe` Right "typing.Optional[str]"
-        specify "SetModifier" $ do
-            let (c'', ctx'') = run' $ compileTypeExpression s (SetModifier "text")
-            standardImports ctx'' `shouldBe` ["typing"]
-            localImports ctx'' `shouldBe` []
-            c'' `shouldBe` Right "typing.AbstractSet[str]"
-        specify "ListModifier" $ do
-            let (c''', ctx''') = run' $ compileTypeExpression s (ListModifier "text")
-            standardImports ctx''' `shouldBe` ["typing"]
-            localImports ctx''' `shouldBe` []
-            c''' `shouldBe` Right "typing.Sequence[str]"
-        specify "MapModifier" $ do
-            let (c'''', ctx'''') = run' $ compileTypeExpression s (MapModifier "uuid" "text")
-            standardImports ctx'''' `shouldBe` ["uuid", "typing"]
-            localImports ctx'''' `shouldBe` []
-            c'''' `shouldBe` Right "typing.Mapping[uuid.UUID, str]"
+        describe "Python 2" $ do
+            specify "TypeIdentifier" $ do
+                let (c, ctx) = run2 $ compileTypeExpression s (TypeIdentifier "bigint")
+                standardImports ctx `shouldBe` []
+                localImports ctx `shouldBe` []
+                c `shouldBe` Right "int"
+            specify "OptionModifier" $ do
+                let (c', ctx') = run2 $ compileTypeExpression s (OptionModifier "text")
+                standardImports ctx' `shouldBe` []
+                localImports ctx' `shouldBe` []
+                c' `shouldBe` Right "typing.Optional[unicode]"
+            specify "SetModifier" $ do
+                let (c'', ctx'') = run2 $ compileTypeExpression s (SetModifier "text")
+                standardImports ctx'' `shouldBe` []
+                localImports ctx'' `shouldBe` []
+                c'' `shouldBe` Right "typing.AbstractSet[unicode]"
+            specify "ListModifier" $ do
+                let (c''', ctx''') = run2 $ compileTypeExpression s (ListModifier "text")
+                standardImports ctx''' `shouldBe` []
+                localImports ctx''' `shouldBe` []
+                c''' `shouldBe` Right "typing.Sequence[unicode]"
+            specify "MapModifier" $ do
+                let (c'''', ctx'''') = run2 $ compileTypeExpression s (MapModifier "uuid" "text")
+                standardImports ctx'''' `shouldBe` ["uuid"]
+                localImports ctx'''' `shouldBe` []
+                c'''' `shouldBe` Right "typing.Mapping[uuid.UUID, unicode]"
+        describe "Python 3" $ do
+            specify "TypeIdentifier" $ do
+                let (c, ctx) = run3 $ compileTypeExpression s (TypeIdentifier "bigint")
+                standardImports ctx `shouldBe` []
+                localImports ctx `shouldBe` []
+                c `shouldBe` Right "int"
+            specify "OptionModifier" $ do
+                let (c', ctx') = run3 $ compileTypeExpression s (OptionModifier "text")
+                standardImports ctx' `shouldBe` ["typing"]
+                localImports ctx' `shouldBe` []
+                c' `shouldBe` Right "typing.Optional[str]"
+            specify "SetModifier" $ do
+                let (c'', ctx'') = run3 $ compileTypeExpression s (SetModifier "text")
+                standardImports ctx'' `shouldBe` ["typing"]
+                localImports ctx'' `shouldBe` []
+                c'' `shouldBe` Right "typing.AbstractSet[str]"
+            specify "ListModifier" $ do
+                let (c''', ctx''') = run3 $ compileTypeExpression s (ListModifier "text")
+                standardImports ctx''' `shouldBe` ["typing"]
+                localImports ctx''' `shouldBe` []
+                c''' `shouldBe` Right "typing.Sequence[str]"
+            specify "MapModifier" $ do
+                let (c'''', ctx'''') = run3 $ compileTypeExpression s (MapModifier "uuid" "text")
+                standardImports ctx'''' `shouldBe` ["uuid", "typing"]
+                localImports ctx'''' `shouldBe` []
+                c'''' `shouldBe` Right "typing.Mapping[uuid.UUID, str]"
 
     describe "toClassName" $ do
         it "transform the facial name of the argument into PascalCase" $ do
