@@ -46,6 +46,7 @@ import Nirum.Targets.List (targetProxyMapQ)
 -- docs/target/x.md file too.
 import Nirum.Targets.Docs ()
 import Nirum.Targets.Python ()
+import Nirum.Targets.Rust ()
 
 data BuildError = TargetNameError TargetName
                 | CompileError (M.Map FilePath Text)
