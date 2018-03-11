@@ -12,3 +12,5 @@ email = "dev@nirum.org"
 name = "nirum_fixture"
 [targets.python.renames]
 "renames.test" = "renamed"
+[targets.rust]
+name = "nirum_fixture"
