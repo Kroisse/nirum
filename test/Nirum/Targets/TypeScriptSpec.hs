@@ -82,7 +82,7 @@ spec = do
 typeScriptTargetSpec :: Spec
 typeScriptTargetSpec = describe "TypeScript target" $ do
     describe "TypeScript type" $
-        it "should be converted to a JSON that holds the NPM package metadata" $
+        it "should be converted to a JSON that holds the package metadata" $
             toJSON package `shouldBe` object [ "name" .= A.String "dummy"
                                              , "version" .= A.String "0.0.1"
                                              ]
@@ -98,42 +98,58 @@ typeScriptTargetSpec = describe "TypeScript target" $ do
                                    , "src" </> "transports" </> "container.ts"
                                    ]
     describe "parseTarget" $
-        it "should require \"name\" field" $
-            (parseTarget emptyTable :: Either MetadataError TypeScript) `shouldBe` Left (FieldError "name")
+        it "should require \"name\" field" $ do
+            let result = parseTarget emptyTable
+                         :: Either MetadataError TypeScript
+            result `shouldBe` Left (FieldError "name")
 
 compilationSpec :: Spec
 compilationSpec = do
     specify "insertLocalImport" $ do
-        let b = do C.insertLocalImport ["transports", "truck"] ["Truck"]
-                   ST.get
-        let C.Context { C.localImports = imports } = fst $ runBuilder b
+        let C.Context { C.localImports = imports } = fst $ runBuilder $ do
+                C.insertLocalImport ["transports", "truck"] ["Truck"]
+                ST.get
         imports `shouldBe` [(["transports", "truck"], ["Truck"])]
     specify "insertLocalImport 2" $ do
-        let b = do C.insertLocalImport ["transports", "truck"] ["Truck"]
-                   C.insertLocalImport ["fruits"] ["Apple", "Banana", "Cherry"]
-                   C.insertLocalImport ["transports", "truck"] ["PickupTruck"]
-                   ST.get
-        let C.Context { C.localImports } = fst $ runBuilder b
-        localImports `shouldBe` [ (["transports", "truck"], ["Truck", "PickupTruck"])
-                                , (["fruits"], ["Apple", "Banana", "Cherry"])
+        let C.Context { C.localImports } = fst $ runBuilder $ do
+                C.insertLocalImport ["transports", "truck"] ["Truck"]
+                C.insertLocalImport ["fruits"] ["Apple", "Banana", "Cherry"]
+                C.insertLocalImport ["transports", "truck"] ["PickupTruck"]
+                ST.get
+        localImports `shouldBe` [ (["transports", "truck"],
+                                   ["Truck", "PickupTruck"])
+                                , (["fruits"],
+                                   ["Apple", "Banana", "Cherry"])
                                 ]
     compileRecordConstructorSpec
     compileRecordDeserializeSpec
     compileRecordSerializeSpec
     compileRecordSpec
     specify "methodDefinition" $ do
-        methodDefinition "get-name" (Just TSNumber) [] (writeLine "return 42;") `shouldBeCompiled`
+        methodDefinition "get-name"
+                         (Just TSNumber)
+                         []
+                         (writeLine "return 42;")
+            `shouldBeCompiled`
             [ "getName(): number {"
             , "    return 42;"
             , "}"
             ]
-        methodDefinition "set-name" Nothing [param "wat" TSString] (writeLine "console.log(wat);") `shouldBeCompiled`
+        methodDefinition "set-name"
+                         Nothing
+                         [param "wat" TSString]
+                         (writeLine "console.log(wat);")
+            `shouldBeCompiled`
             [ "setName(wat: string) {"
             , "    console.log(wat);"
             , "}"
             ]
     specify "staticMethodDefinition" $
-        staticMethodDefinition "from-json" (Just $ TSNirum "package") [] (writeLine "return 42;") `shouldBeCompiled`
+        staticMethodDefinition "from-json"
+                               (Just $ TSNirum "package")
+                               []
+                               (writeLine "return 42;")
+            `shouldBeCompiled`
             [ "static fromJson(): Package {"
             , "    return 42;"
             , "}"

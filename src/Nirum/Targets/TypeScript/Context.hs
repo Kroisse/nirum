@@ -1,5 +1,5 @@
 module Nirum.Targets.TypeScript.Context ( CodeBuilder
-                                        , Context ( .. )
+                                        , Context (..)
                                         , empty
                                         , insertLocalImport
                                         ) where
@@ -12,9 +12,10 @@ import qualified Nirum.CodeBuilder as CB
 import Nirum.Constructs.ModulePath ( ModulePath )
 import Nirum.Package.Metadata ( Target )
 
-data Context = Context { localImports :: M.Map ModulePath (S.Set T.Text)
-                       , thirdPartyImports :: M.Map ModulePath (M.Map T.Text T.Text)
-                       }
+data Context =
+    Context { localImports :: M.Map ModulePath (S.Set T.Text)
+            , thirdPartyImports :: M.Map ModulePath (M.Map T.Text T.Text)
+            }
     deriving (Eq, Show)
 
 empty :: Context
@@ -24,7 +25,10 @@ empty = Context { localImports = M.empty
 
 type CodeBuilder t = CB.CodeBuilder t Context
 
-insertLocalImport :: (Target t) => ModulePath -> S.Set T.Text -> CodeBuilder t ()
+insertLocalImport :: Target t
+                  => ModulePath
+                  -> S.Set T.Text
+                  -> CodeBuilder t ()
 insertLocalImport path names = ST.modify insert'
   where
     insert' s@Context { localImports = imports } =

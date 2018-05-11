@@ -69,9 +69,9 @@ hierarchies :: S.Set ModulePath -> S.Set ModulePath
 hierarchies modulePaths = S.unions $ toList $ S.map hierarchy modulePaths
 
 length :: ModulePath -> Int
-length a = length' 1 a
+length = length' 1
   where
-    length' !n ModuleName { } = n
+    length' !n ModuleName {} = n
     length' !n ModulePath { path } = length' (n + 1) path
 
 replacePrefix :: ModulePath -> ModulePath -> ModulePath -> ModulePath

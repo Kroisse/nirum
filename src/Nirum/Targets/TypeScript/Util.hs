@@ -1,7 +1,9 @@
-{-# LANGUAGE FlexibleInstances, NamedFieldPuns, OverloadedLists, TypeFamilies #-}
-module Nirum.Targets.TypeScript.Util ( FunctionParameter ( .. )
-                                     , ToDoc ( .. )
-                                     , TSType ( .. )
+{-# LANGUAGE FlexibleInstances, NamedFieldPuns, OverloadedLists,
+             TypeFamilies #-}
+module Nirum.Targets.TypeScript.Util ( FunctionParameter (..)
+                                     , ToDoc (..)
+                                     , TSType (..)
+                                     , constDecl
                                      , dot
                                      , eq
                                      , functionDefinition'
@@ -10,6 +12,7 @@ module Nirum.Targets.TypeScript.Util ( FunctionParameter ( .. )
                                      , importRuntimeStatement
                                      , importStatement
                                      , keywords
+                                     , letDecl
                                      , list
                                      , methodDefinition
                                      , ne
@@ -27,12 +30,11 @@ module Nirum.Targets.TypeScript.Util ( FunctionParameter ( .. )
 import qualified Data.Set as S
 import qualified Data.Text as T
 import GHC.Exts (IsList (toList))
-import qualified Text.PrettyPrint as P
-import Text.PrettyPrint (Doc, (<>), (<+>))
+import Text.PrettyPrint hiding (nest)
 
 import qualified Nirum.CodeBuilder as CB
 import Nirum.CodeBuilder (modulePath, nest, writeLine)
-import qualified Nirum.Constructs.Name as N
+import Nirum.Constructs.Name
 import Nirum.Constructs.Identifier ( Identifier
                                    , toCamelCaseText
                                    , toPascalCaseText
@@ -45,20 +47,20 @@ import Nirum.Package.Metadata ( Target )
 import Nirum.Targets.TypeScript.Context ( CodeBuilder )
 
 
-eq :: Doc
-eq = "==="
+eq :: Doc -> Doc -> Doc
+a `eq` b = a <+> "===" <+> b
 
-ne :: Doc
-ne = "!=="
+ne :: Doc -> Doc -> Doc
+a `ne` b = a <+> "!==" <+> b
 
 if' :: (Target t) => Doc -> CodeBuilder t () -> CodeBuilder t ()
 if' cond body = do
-    writeLine $ "if" <+> P.parens cond <+> P.lbrace
+    writeLine $ "if" <+> parens cond <+> lbrace
     nest 4 body
-    writeLine P.rbrace
+    writeLine rbrace
 
 return' :: (Target t) => Doc -> CB.CodeBuilder t s ()
-return' value = writeLine $ "return" <+> value <> P.semi
+return' value = writeLine $ "return" <+> value <> semi
 
 data FunctionParameter = FunctionParameter { paramType :: TSType
                                            , paramName :: Identifier
@@ -69,28 +71,33 @@ param = flip FunctionParameter
 
 functionDefinition'
     :: (Target t)
-    => P.Doc  -- prefix
-    -> P.Doc  -- end
-    -> P.Doc  -- function name
+    => Doc  -- prefix
+    -> Doc  -- end
+    -> Doc  -- function name
     -> Maybe TSType  -- return type
     -> [FunctionParameter]  -- parameters
     -> CB.CodeBuilder t s ()  -- function body
     -> CB.CodeBuilder t s ()
 functionDefinition' prefix end name ret params body = do
-    writeLine $ prefix <+> name <> P.parens params' <> returns' ret <+> P.lbrace
+    writeLine $ prefix <+> name <> parens params' <>
+                returns' ret <+> lbrace
     nest 4 body
-    writeLine $ P.rbrace <> end
+    writeLine $ rbrace <> end
   where
-    params' = list P.comma params
+    params' = list comma params
     returns' :: Maybe TSType -> Doc
-    returns' (Just r) = P.colon <+> toDoc r
-    returns' Nothing = P.empty
+    returns' (Just r) = colon <+> toDoc r
+    returns' Nothing = empty
 
-list :: (ToDoc a) => P.Doc -> [a] -> P.Doc
-list sep = P.sep . P.punctuate sep . map toDoc
+list :: (ToDoc a) => Doc -> [a] -> Doc
+list s = sep . punctuate s . map toDoc
 
--- functionDefinition :: P.Doc -> Maybe TSType -> [FunctionParameter] -> CodeBuilder () -> CodeBuilder ()
--- functionDefinition = functionDefinition' "function" P.empty
+-- functionDefinition :: Doc
+--                    -> Maybe TSType
+--                    -> [FunctionParameter]
+--                    -> CodeBuilder ()
+--                    -> CodeBuilder ()
+-- functionDefinition = functionDefinition' "function" empty
 
 methodDefinition
     :: (Target t)
@@ -99,7 +106,7 @@ methodDefinition
     -> [FunctionParameter]  -- parameters
     -> CB.CodeBuilder t s ()  -- method body
     -> CB.CodeBuilder t s ()
-methodDefinition name = functionDefinition' P.empty P.empty name'
+methodDefinition name = functionDefinition' empty empty name'
   where
     name' = toAttributeName name
 
@@ -110,27 +117,53 @@ staticMethodDefinition
     -> [FunctionParameter]  -- parameters
     -> CB.CodeBuilder t s ()  -- method body
     -> CB.CodeBuilder t s ()
-staticMethodDefinition name = functionDefinition' (P.text "static") P.empty name'
+staticMethodDefinition name =
+    functionDefinition' (text "static") empty name'
   where
     name' = toAttributeName name
 
+constDecl :: Target t
+    => Name  -- name
+    -> TSType  -- type
+    -> Doc  -- value
+    -> CodeBuilder t ()
+constDecl name ty val =
+    writeLine $ "const" <+> name' <> colon <+> toDoc ty <+> equals <+>
+                val <> semi
+  where
+    name' = toAttributeName $ facialName name
+
+letDecl :: Target t
+    => Name  -- name
+    -> TSType  -- type
+    -> Doc  -- value
+    -> CodeBuilder t ()
+letDecl name ty val =
+    writeLine $ "let" <+> name' <> colon <+> toDoc ty <+> equals <+>
+                val <> semi
+  where
+    name' = toAttributeName $ facialName name
+
 throw :: (Target t, ToDoc a, ToDoc b) => a -> [b] -> CB.CodeBuilder t s ()
-throw name args = writeLine $ "throw" <+> "new" <+> toDoc name <> P.parens (list P.comma args) <> P.semi
+throw name args =
+    writeLine $ "throw" <+>
+                "new" <+> toDoc name <> parens (list comma args) <>
+                semi
 
 toAttributeName :: Identifier -> Doc
 toAttributeName = toDoc . toCamelCaseText
 
 toFieldName :: Field -> Doc
-toFieldName = toAttributeName . N.facialName . fieldName
+toFieldName = toAttributeName . facialName . fieldName
 
 toClassName :: Identifier -> Doc
 toClassName = toDoc . toPascalCaseText
 
-toBehindTypeName :: N.Name -> Doc
-toBehindTypeName = toDoc . toSnakeCaseText . N.behindName
+toBehindTypeName :: Name -> Doc
+toBehindTypeName = toDoc . toSnakeCaseText . behindName
 
-dot :: P.Doc -> P.Doc -> P.Doc
-a `dot` b = a <> P.char '.' <> b
+dot :: Doc -> Doc -> Doc
+a `dot` b = a <> char '.' <> b
 
 thisDot :: Doc -> Doc
 thisDot a = "this" `dot` a
@@ -141,16 +174,16 @@ data TSType = TSAny
             | TSNumber
             | TSString
             | TSArray TSType
-            | TSNirum N.Name
+            | TSNirum Name
 
 class ToDoc a where
     toDoc :: a -> Doc
 
-instance ToDoc P.Doc where
+instance ToDoc Doc where
     toDoc = id
 
 instance ToDoc T.Text where
-    toDoc = P.text . T.unpack
+    toDoc = text . T.unpack
 
 instance ToDoc TSType where
     toDoc TSAny = "any"
@@ -158,11 +191,11 @@ instance ToDoc TSType where
     toDoc TSNull = "null"
     toDoc TSNumber = "number"
     toDoc TSString = "string"
-    toDoc (TSArray e) = P.brackets $ toDoc e
-    toDoc (TSNirum n) = toClassName $ N.facialName n
+    toDoc (TSArray e) = brackets $ toDoc e
+    toDoc (TSNirum n) = toClassName $ facialName n
 
 instance ToDoc FunctionParameter where
-    toDoc (FunctionParameter ty n) = toAttributeName n <> P.colon <+> toDoc ty
+    toDoc (FunctionParameter ty n) = toAttributeName n <> colon <+> toDoc ty
 
 -- | The set of TypeScript reserved keywords.
 -- See also: https://www.ecma-international.org/ecma-262/5.1/#sec-7.6.1.1
@@ -178,26 +211,26 @@ keywords = [ "break", "do", "instanceof", "typeof", "case", "else", "new"
 relativePath :: ModulePath
              -> ModulePath
              -> Doc
-relativePath ModuleName { }          target = rel' 0 [] (toList target)
+relativePath ModuleName {} target = rel' 0 [] (toList target)
 relativePath ModulePath { path = p } target = rel' 0 (toList p) (toList target)
 
 rel' :: Int -> [Identifier] -> [Identifier] -> Doc
 rel' _ _ [] = error "invalid"
 rel' depth [] t = toRelPrefix depth <> "/" <> toPath t
-rel' depth (a:as) (b:bs)
+rel' depth (a : as) (b : bs)
     | a == b && bs /= [] = rel' depth as bs
-    | otherwise          = rel' (depth + 1 + length as) [] (b:bs)
+    | otherwise = rel' (depth + 1 + length as) [] (b : bs)
 toRelPrefix :: (Num t, Eq t) => t -> Doc
 toRelPrefix 0 = "."
 toRelPrefix 1 = ".."
 toRelPrefix n = "../" <> toRelPrefix (n - 1)
 toPath :: [Identifier] -> Doc
-toPath = P.hcat . P.punctuate "/" . map (toDoc . toSnakeCaseText)
+toPath = hcat . punctuate "/" . map (toDoc . toSnakeCaseText)
 
 importRuntimeStatement :: Target t => [Doc] -> CodeBuilder t ()
 importRuntimeStatement names = do
     base <- modulePath
-    let p = (toRelPrefix $ MP.length base - 1) <> "/__rt"
+    let p = toRelPrefix (MP.length base - 1) <> "/__rt"
     importRawStatement names p
 
 importStatement :: Target t => [Doc] -> ModulePath -> CodeBuilder t ()
@@ -208,5 +241,5 @@ importStatement names path = do
 
 importRawStatement :: Target t => [Doc] -> Doc -> CodeBuilder t ()
 importRawStatement names path = do
-    let items = P.braces $ P.hsep $ P.punctuate P.comma names
-    writeLine $ "import" <+> items <+> "from" <+> P.quotes path <> P.semi
+    let items = braces $ hsep $ punctuate comma names
+    writeLine $ "import" <+> items <+> "from" <+> quotes path <> semi
