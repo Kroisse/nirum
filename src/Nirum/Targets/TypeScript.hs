@@ -8,6 +8,7 @@ module Nirum.Targets.TypeScript ( TypeScript (TypeScript, packageName)
                                 , compilePackage'
                                 ) where
 
+import Control.Monad
 import Data.Aeson.Encode.Pretty
 import Data.Aeson.Types
 import Data.ByteString.Lazy hiding (unpack)
@@ -35,8 +36,6 @@ import Nirum.Constructs.Identifier
 import Nirum.Package.Metadata hiding (fieldType)
 import Nirum.Targets.TypeScript.Context hiding (empty)
 import Nirum.Targets.TypeScript.TypeExpression
-import Nirum.TypeInstance.BoundModule
-import qualified Nirum.TypeInstance.BoundModule as BM
 import qualified Nirum.Targets.TypeScript.Context as TC
 
 type CompileError' = Markup
@@ -49,11 +48,15 @@ data Source = Source { sourcePackage :: Package TypeScript
 
 instance ToJSON (Package TypeScript) where
     toJSON package = object [ "name" .= p
+                            , "description" .= d
                             , "version" .= SV.toText v
+                            , "dependencies" .= dependencies
                             ]
       where
-        Metadata { version = v } = metadata package
+        Metadata { description = d, version = v } = metadata package
         TypeScript { packageName = p } = packageTarget package
+        dependencies = object [ "runtypes" .= ( "^2.1.6" :: Text )
+                              ]
 
 instance Target TypeScript where
     type CompileResult TypeScript = Code
@@ -69,28 +72,27 @@ instance Target TypeScript where
         Data.ByteString.Lazy.toStrict . Text.Blaze.Renderer.Utf8.renderMarkup
 
 
-compilePackageMetadata :: (Package TypeScript) -> Code
-compilePackageMetadata =
+compileJSONMetadata :: (ToJSON a) => a -> Code
+compileJSONMetadata =
     preEscapedToMarkup . toLazyText . encodePrettyToTextBuilder
 
 compilePackage' :: Package TypeScript
                 -> Map FilePath (Either CompileError' Code)
 compilePackage' package =
     MS.fromList $
-        files ++ [ ("package.json", Right $ compilePackageMetadata package)
-                 , ("tsconfig.json", Right $ tsConfig)
+        files ++ [ ("package.json", Right $ compileJSONMetadata package)
+                 , ("tsconfig.json", Right $ compileJSONMetadata tsConfig)
                  ]
   where
-    tsConfig :: Code
-    tsConfig = preEscapedToMarkup $ encodePrettyToTextBuilder $
-        object [ "compilerOptions" .= compilerOptions ]
+    tsConfig :: Value
+    tsConfig = object [ "compilerOptions" .= compilerOptions ]
     compilerOptions :: Value
     compilerOptions = object [ "strict" .= True
                              , "target" .= ( "es2015" :: Text )
                              , "module" .= ( "commonjs" :: Text )
                              , "declaration" .= True
                              ]
-    
+
     toTypeScriptFilename :: ModulePath -> [FilePath]
     toTypeScriptFilename mp =
       case mp of
@@ -112,29 +114,29 @@ compilePackage' package =
             ]
 
 compile :: Source -> Either CompileError' Code
-compile source@Source { sourcePackage = package
-                      , sourceModulePath = mp' } = do
+compile Source { sourcePackage = package
+               , sourceModulePath = mp' } = do
     let (_, code) = CB.runBuilder package mp' TC.empty moduleBody
     return [compileText|"use strict";
 
-#{code}
-|]
+#{code}|]
   where
     moduleBody :: CodeBuilder TypeScript ()
     moduleBody = do
         td <- CB.boundTypes
-        mapM_ compileTypeDeclaration $ DS.toList td
+        forM_ (DS.toList td) $ \t -> do
+            compileTypeDeclaration t
+            CB.appendCode $ text "\n"
 
 compileTypeDeclaration :: TypeDeclaration
                        -> CodeBuilder TypeScript ()
 compileTypeDeclaration TypeDeclaration { typename = n
                                        , type' = RecordType fields'
                                        } = compileRecordType n fields'
-compileTypeDeclaration _ _ = CB.appendCode [compileText|
+compileTypeDeclaration _ = CB.appendCode [compileText|
 /* ------ has to be implemented
 throw Error()
 ------------------------------*/
-
 |]  -- never used
 
 compileRecordType :: Name

@@ -5,6 +5,7 @@ module Nirum.CodeBuilder (
     -- * The CodeBuilder monad
     CodeBuilder,
     appendCode,
+    boundTypes,
     runBuilder,
     lookupType,
     ) where
@@ -18,11 +19,10 @@ import Data.Maybe (fromMaybe)
 import Text.Blaze
 
 import Nirum.Constructs.DeclarationSet hiding (empty)
-import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.TypeDeclaration
-import Nirum.Package.Metadata (Package (..), Target (..))
+import Nirum.Package.Metadata
 import qualified Nirum.TypeInstance.BoundModule as BoundModule
 
 -- | A code builder monad parameterized by:
@@ -36,7 +36,7 @@ newtype Target t => CodeBuilder t s a = CodeBuilder (State (BuildState t s) a)
              )
 
 data Target t => BuildState t s =
-    BuildState { output :: [Markup]
+    BuildState { output :: Markup
                , boundModule :: BoundModule.BoundModule t
                , innerState :: s
                }
@@ -62,7 +62,7 @@ modify' = CodeBuilder . ST.modify
 appendCode :: Target t
            => Markup
            -> CodeBuilder t s ()
-appendCode code = modify' $ \ s -> s { output = output s ++ [code] }
+appendCode code = modify' $ \ s -> s { output = output s <> code }
 
 -- | Look up the actual type by the name from the context of the builder
 -- computation.
@@ -80,23 +80,18 @@ runBuilder :: Target t
            -> s                  -- ^ initial state
            -> CodeBuilder t s a  -- ^ code builder computation to execute
            -> (a, Markup)     -- ^ return value and build result
-runBuilder package modPath st (CodeBuilder a) = (ret, rendered)
+runBuilder package modPath st (CodeBuilder a) = (ret, out')
   where
     mod' = fromMaybe (error "never happend")
                      (BoundModule.resolveBoundModule modPath package)
-    initialState = BuildState { output = []
+    initialState = BuildState { output = mempty
                               , boundModule = mod'
                               , innerState = st
                               }
     (ret, finalState) = runState a initialState
     out' = output finalState
-    rendered = joinMarkup out'
 
-
-joinMarkup :: [Markup] -> Markup
-joinMarkup ms = foldMap contents ms
-
-boundTypes :: Target t -> CodeBuilder t (DeclarationSet TypeDeclaration)
+boundTypes :: Target t => CodeBuilder t s (DeclarationSet TypeDeclaration)
 boundTypes = do
-    types <- fmap boundModule get'
-    return $ BoundModule.findInBoundModule types DS.empty
+    m <- fmap boundModule get'
+    return $ BoundModule.boundTypes m
