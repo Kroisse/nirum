@@ -5,7 +5,7 @@ Build
 -----
 
 In the same way to other Haskell softwares, Nirum compiler can be built using
-[Haskell Stack][].  If you didn't install it yet see also its
+[Haskell Stack].  If you didn't install it yet see also its
 [installation guide][1].
 
 If it's your first build of Nirum compiler you need to setup a proper version
@@ -64,8 +64,8 @@ changes breaking either testing cannot be merged.
 [![Build Status (Travis CI)][ci-svg]][ci]
 [![Build Status (AppVeyor)][ciw-svg]][ciw]
 
-[ci-svg]: https://travis-ci.org/spoqa/nirum.svg?branch=master
-[ci]: https://travis-ci.org/spoqa/nirum
+[ci-svg]: https://travis-ci.com/nirum-lang/nirum.svg?branch=master
+[ci]: https://travis-ci.com/nirum-lang/nirum
 [ciw-svg]: https://ci.appveyor.com/api/projects/status/jf9bsrnalcb1xrp0?svg=true
 [ciw]: https://ci.appveyor.com/project/dahlia/nirum-k5n5y
 
@@ -73,7 +73,7 @@ changes breaking either testing cannot be merged.
 External dependencies
 ---------------------
 
-Each target test suite has its external dependencies (i.e. non-library program
+Each target test suite has its external dependencies (i.e., non-library program
 dependencies):
 
  -  Python
@@ -82,3 +82,35 @@ dependencies):
      -  [`tox`][tox] 3.0.0 or higher
 
 [tox]: https://tox.readthedocs.io/
+
+
+Lint
+----
+
+Since we want to keep our coding style consistently, we run [lint] to check
+it.  You can get more information about [hlint] on its homepage.
+
+We recommend you to register lint to Git hooks.
+
+~~~~~~~~ bash
+ln -s "$PWD/lint.sh" "$PWD/.git/hooks/pre-commit"
+~~~~~~~~
+
+If you have registered a hook once, it will be automatically executed
+when you make a commit.
+
+
+Changelog
+---------
+
+We believe logging changes is a part of making software.
+So we have the policy enforcing every pull request to have an entry to changelog
+(i.e., a diff on *CHANGES.md* file) on the [CI][changelog-test-ci].
+
+Please put `[chagelog skip]` on commit message if your change is not related to
+the Nirum compiler (e.g., fixing a typo).
+
+
+[lint]: https://en.wikipedia.org/wiki/Lint_(software)
+[hlint]: https://github.com/ndmitchell/hlint
+[changelog-test-ci]: https://github.com/nirum-lang/nirum/blob/7dcd1bbaffacff05d8ad91bf2018898ffdc3f0a6/.travis.yml#L45-L55

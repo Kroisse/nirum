@@ -45,7 +45,7 @@ record record-with-optional-record-field (
 );
 
 record import-typing (
-    // see also: https://github.com/spoqa/nirum/issues/93
+    // see also: https://github.com/nirum-lang/nirum/issues/93
     bigint? an-optional-field,
 );
 
@@ -144,5 +144,3 @@ record name-shadowing-field-record (
 union optional-union = foo ( int32? bar )
                      | baz ( int32 qux )
                      ;
-
-unboxed website (uri);

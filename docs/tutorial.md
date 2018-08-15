@@ -4,7 +4,7 @@ Step-by-step tutorial
 Estimated time to complete this tutorial (reading and exercising): an hour.
 
 FYI there's the Git repository which contains all example source codes
-from this tutorial: <https://github.com/spoqa/nirum-tutorial-examples>.
+from this tutorial: <https://github.com/nirum-lang/nirum-tutorial-examples>.
 
 
 What Nirum is for
@@ -121,7 +121,7 @@ Installing compiler
 The Nirum compiler works on the most major platforms like Linux, macOS, and
 Windows.  The [official releases page][] provides the prebuilt executable
 binaries for these three platforms.  Note that there is no stable version
-(i.e., v1.0.0 or higher) as of February 2018.
+(i.e., v1.0.0 or higher) as of May 2018.
 
 This tutorial assumes that you have:
 
@@ -135,10 +135,10 @@ a command-line prompt and it's consistent within this tutorial):
 
 ~~~~~~~~ sh
 $ nirum -v
-0.4.2
+0.5.0
 ~~~~~~~~
 
-[official releases page]: https://github.com/spoqa/nirum/releases
+[official releases page]: https://github.com/nirum-lang/nirum/releases
 
 
 Service interface
