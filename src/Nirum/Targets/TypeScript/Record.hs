@@ -9,17 +9,17 @@ import Nirum.Constructs.DeclarationSet
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Name
 import Nirum.Constructs.TypeDeclaration
-import Nirum.Constructs.Identifier
 import {-# SOURCE #-} Nirum.Targets.TypeScript ()
 import Nirum.Targets.TypeScript.Context hiding (empty)
+import Nirum.Targets.TypeScript.Util
 
 
 compileRecordType :: Name
                   -> DeclarationSet Field
                   -> CodeBuilder TypeScript ()
-compileRecordType (Name fName _) fs = do
+compileRecordType name fs = do
     ck <- CB.render_ $ compileTypeChecker fields'
-    CB.appendCode [compileText|export class #{className} {
+    CB.appendCode [compileText|export class #{ className' } {
     static _checker = #{ ck };
 
     constructor(
@@ -32,14 +32,14 @@ compileRecordType (Name fName _) fs = do
 
     public static fromValue(value: unknown) {
         const checked = this._checker.check(value);
-        return new #{ className }(
+        return new #{ className' }(
 %{ forall field <- fields' }
             checked.#{ behindFieldName field } as any,
 %{ endforall }
         );
     }
 
-    public toValue(): _r.Static<typeof #{ className }._checker> {
+    public toValue(): _r.Static<typeof #{ className' }._checker> {
         return {
 %{ forall field <- fields' }
             #{ behindFieldName field }: this.#{ facialFieldName field },
@@ -49,14 +49,10 @@ compileRecordType (Name fName _) fs = do
 }
 |]
   where
-    className :: Text
-    className = toPascalCaseText fName
     fields' :: [Field]
     fields' = DS.toList fs
-    behindFieldName :: Field -> Text
-    behindFieldName = toSnakeCaseText . behindName . fieldName
-    facialFieldName :: Field -> Text
-    facialFieldName = toCamelCaseText . facialName . fieldName
+    className' :: Text
+    className' = className name
     compileTypeChecker :: [Field] -> CodeBuilder TypeScript ()
     compileTypeChecker fs' = CB.appendCode [compileText|_r.Record({
 %{ forall field <- fs' }
