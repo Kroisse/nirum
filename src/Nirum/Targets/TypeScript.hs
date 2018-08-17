@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -26,14 +27,18 @@ import Text.Blaze.Renderer.Text
 import Text.Heterocephalus hiding (compile)
 
 import qualified Nirum.CodeBuilder as CB hiding (CodeBuilder)
+import qualified Nirum.Constructs.Declaration as D
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.ModulePath
 import Nirum.Constructs.TypeDeclaration
 import qualified Nirum.Package.ModuleSet as NMS
 import Nirum.Constructs.Identifier
+import Nirum.Constructs.Name
 import Nirum.Package.Metadata hiding (fieldType)
 import Nirum.Targets.TypeScript.Context hiding (empty)
+import Nirum.Targets.TypeScript.Enum
 import Nirum.Targets.TypeScript.Record
+import Nirum.Targets.TypeScript.Util
 import qualified Nirum.Targets.TypeScript.Context as TC
 
 type CompileError' = Markup
@@ -137,11 +142,15 @@ import * as _r from 'runtypes';
 
 compileTypeDeclaration :: TypeDeclaration
                        -> CodeBuilder TypeScript ()
-compileTypeDeclaration TypeDeclaration { typename = n
-                                       , type' = RecordType fields'
-                                       } = compileRecordType n fields'
-compileTypeDeclaration _ = CB.appendCode [compileText|
-/* ------ has to be implemented
-throw Error()
-------------------------------*/
-|]  -- never used
+compileTypeDeclaration TypeDeclaration { typename, type' } =
+    compileTypeDeclaration' typename type'
+compileTypeDeclaration decl = CB.appendCode [compileText|
+// TODO compile '#{ className $ D.name decl }'
+|]
+
+compileTypeDeclaration' :: Name -> Type -> CodeBuilder TypeScript ()
+compileTypeDeclaration' n (EnumType members') = compileEnumType n members'
+compileTypeDeclaration' n (RecordType fields') = compileRecordType n fields'
+compileTypeDeclaration' n _ = CB.appendCode [compileText|
+// TODO: compile '#{ className n }'
+|]

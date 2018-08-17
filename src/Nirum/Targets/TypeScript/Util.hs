@@ -6,16 +6,16 @@ module Nirum.Targets.TypeScript.Util (
 
 import Data.Text
 
+import qualified Nirum.Constructs.Declaration as D
 import Nirum.Constructs.Name
-import Nirum.Constructs.TypeDeclaration
 import Nirum.Constructs.Identifier
 
 
 className :: Name -> Text
 className = toPascalCaseText . facialName
 
-behindFieldName :: Field -> Text
-behindFieldName = toSnakeCaseText . behindName . fieldName
+behindFieldName :: D.Declaration a => a -> Text
+behindFieldName = toSnakeCaseText . behindName . D.name
 
-facialFieldName :: Field -> Text
-facialFieldName = toCamelCaseText . facialName . fieldName
+facialFieldName :: D.Declaration a => a -> Text
+facialFieldName = toCamelCaseText . facialName . D.name
