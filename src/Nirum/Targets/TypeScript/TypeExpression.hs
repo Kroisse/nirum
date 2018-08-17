@@ -1,5 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
-module Nirum.Targets.TypeScript.TypeExpression (compileTypeExpression) where 
+module Nirum.Targets.TypeScript.TypeExpression (compileTypeExpression) where
 
 import Data.Text
 
@@ -7,7 +7,7 @@ import qualified Nirum.CodeBuilder as CB hiding (CodeBuilder)
 import Nirum.Constructs.Identifier
 import Nirum.Constructs.TypeDeclaration
 import Nirum.Constructs.TypeExpression
-import {-# SOURCE #-} Nirum.Targets.TypeScript ()
+import Nirum.Targets.TypeScript ()
 import Nirum.Targets.TypeScript.Context
 import Nirum.TypeInstance.BoundModule
 
@@ -32,7 +32,7 @@ compilePrimitiveType pti =
         Decimal -> compilePrimitiveType Bigint
         Int32 -> compilePrimitiveType Bigint
         Int64 -> compilePrimitiveType Bigint
-        Float32 -> compilePrimitiveType Bigint 
+        Float32 -> compilePrimitiveType Bigint
         Float64 -> compilePrimitiveType Bigint
         Text -> return "string"
         Binary -> compilePrimitiveType Bigint

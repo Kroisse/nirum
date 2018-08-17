@@ -15,7 +15,7 @@ import Data.ByteString.Lazy hiding (unpack)
 import Data.Map.Strict hiding (empty)
 import qualified Data.Map.Strict as MS
 import Data.SemVer as SV hiding (toLazyText, metadata, version)
-import Data.Text
+import Data.Text as T
 import qualified Data.Text.Lazy as LT
 import Data.Text.Lazy.Builder
 import qualified GHC.Exts as EXT
@@ -35,7 +35,6 @@ import qualified Nirum.Package.ModuleSet as NMS
 import Nirum.Constructs.Identifier
 import Nirum.Package.Metadata hiding (fieldType)
 import Nirum.Targets.TypeScript.Context hiding (empty)
-import Nirum.Targets.TypeScript.TypeExpression
 import qualified Nirum.Targets.TypeScript.Context as TC
 
 type CompileError' = Markup
@@ -51,12 +50,18 @@ instance ToJSON (Package TypeScript) where
                             , "description" .= d
                             , "version" .= SV.toText v
                             , "dependencies" .= dependencies
+                            , "devDependencies" .= devDependencies
+                            , "scripts" .= scripts
                             ]
       where
         Metadata { description = d, version = v } = metadata package
         TypeScript { packageName = p } = packageTarget package
-        dependencies = object [ "runtypes" .= ( "^2.1.6" :: Text )
+        dependencies = object [ "runtypes" .= T.pack "^2.1.6"
                               ]
+        devDependencies = object [ "typescript" .= T.pack "^3.0"
+                                 ]
+        scripts = object [ "build" .= T.pack "tsc"
+                         ]
 
 instance Target TypeScript where
     type CompileResult TypeScript = Code
@@ -85,12 +90,14 @@ compilePackage' package =
                  ]
   where
     tsConfig :: Value
-    tsConfig = object [ "compilerOptions" .= compilerOptions ]
-    compilerOptions :: Value
+    tsConfig = object [ "compilerOptions" .= compilerOptions
+                      , "include" .= ( [ "src/**/*.ts" ] :: [Text] )
+                      ]
     compilerOptions = object [ "strict" .= True
                              , "target" .= ( "es2015" :: Text )
                              , "module" .= ( "commonjs" :: Text )
                              , "declaration" .= True
+                             , "rootDir" .= ( "./" :: Text )
                              ]
 
     toTypeScriptFilename :: ModulePath -> [FilePath]
@@ -118,6 +125,7 @@ compile Source { sourcePackage = package
                , sourceModulePath = mp' } = do
     let (_, code) = CB.runBuilder package mp' TC.empty moduleBody
     return [compileText|"use strict";
+import * as _r from 'runtypes';
 
 #{code}|]
   where
@@ -143,20 +151,33 @@ compileRecordType :: Name
                   -> DeclarationSet Field
                   -> CodeBuilder TypeScript ()
 compileRecordType (Name fName _) fs = do
-    fc <- mapM compileRecordField fields'
+    ck <- CB.render_ $ compileTypeChecker fields'
     CB.appendCode [compileText|export class #{className} {
-%{ forall f <- fc }
-    #{ f };
-%{ endforall }
+    static _checker = #{ ck };
 
     constructor(
-%{ forall f <- fc }
-        #{ f },
+%{ forall field <- fields' }
+        public readonly #{ facialFieldName field }: any,
 %{ endforall }
     ) {
-%{ forall f <- fields' }
-        this.#{toCamelCase' f} = #{toCamelCase' f}
+        Object.freeze(this);
+    }
+
+    public static fromValue(value: unknown) {
+        const checked = this._checker.check(value);
+        return new #{ className }(
+%{ forall field <- fields' }
+            checked.#{ behindFieldName field } as any,
 %{ endforall }
+        );
+    }
+
+    public toValue(): _r.Static<typeof #{ className }._checker> {
+        return {
+%{ forall field <- fields' }
+            #{ behindFieldName field }: this.#{ facialFieldName field },
+%{ endforall }
+        };
     }
 }
 |]
@@ -165,10 +186,13 @@ compileRecordType (Name fName _) fs = do
     className = toPascalCaseText fName
     fields' :: [Field]
     fields' = DS.toList fs
-    toCamelCase' :: Field -> Text
-    toCamelCase' Field { fieldName = (Name fieldFacialName _) } =
-        toCamelCaseText fieldFacialName
-    compileRecordField :: Field -> CodeBuilder TypeScript Markup
-    compileRecordField fd@Field { fieldType = ft } = do
-        fieldType' <- compileTypeExpression $ Just ft
-        return [compileText|#{toCamelCase' fd}: #{fieldType'}|]
+    behindFieldName :: Field -> Text
+    behindFieldName = toSnakeCaseText . behindName . fieldName
+    facialFieldName :: Field -> Text
+    facialFieldName = toCamelCaseText . facialName . fieldName
+    compileTypeChecker :: [Field] -> CodeBuilder TypeScript ()
+    compileTypeChecker fs' = CB.appendCode [compileText|_r.Record({
+%{ forall field <- fs' }
+        #{ behindFieldName field }: _r.Always,
+%{ endforall }
+    })|]

@@ -6,6 +6,8 @@ module Nirum.CodeBuilder (
     CodeBuilder,
     appendCode,
     boundTypes,
+    render,
+    render_,
     runBuilder,
     lookupType,
     ) where
@@ -90,6 +92,18 @@ runBuilder package modPath st (CodeBuilder a) = (ret, out')
                               }
     (ret, finalState) = runState a initialState
     out' = output finalState
+
+render :: Target t => CodeBuilder t s a -> CodeBuilder t s (a, Markup)
+render (CodeBuilder a) = do
+    st <- get'
+    let (ret, nextState) = runState a (st { output = mempty })
+    put' nextState { output = output st }
+    return (ret, output nextState)
+
+render_ :: Target t => CodeBuilder t s () -> CodeBuilder t s Markup
+render_ cb = do
+    (_, out) <- render cb
+    return out
 
 boundTypes :: Target t => CodeBuilder t s (DeclarationSet TypeDeclaration)
 boundTypes = do
